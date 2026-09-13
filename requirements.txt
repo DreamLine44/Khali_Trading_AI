@@ -1,0 +1,17 @@
+# Python >=3.11 is required by scikit-learn 1.9.0 and the checked-in model artifact.
+numpy>=1.26
+pandas>=2.2
+# Pinned exactly, not >=: model artifacts under models/ are pickled by this
+# library and joblib/pickle load can break across scikit-learn minor
+# versions (confirmed: a 1.8.0-trained artifact fails to unpickle under
+# 1.9.0 with "No module named '_loss'"). An unpinned range lets a fresh
+# `pip install -r requirements.txt` silently produce an incompatible
+# environment for every artifact already checked into models/. If you
+# bump this, retrain and re-save every checked-in artifact in the same
+# environment.
+scikit-learn==1.9.0
+joblib>=1.4
+pytest>=8.0
+
+xgboost>=2.1
+lightgbm>=4.5

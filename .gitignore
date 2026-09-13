@@ -1,0 +1,15 @@
+node_modules/
+dist/
+*.log
+.env
+.env.*
+!.env.example
+monitoring/logs/*.jsonl
+# Generated at runtime by writeRuntimeStatus/writeCycleFailureStatus every
+# cycle — real risk of accidentally committing a stale/local snapshot.
+src/monitoring/runtime/status.json
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/

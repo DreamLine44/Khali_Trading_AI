@@ -1,0 +1,333 @@
+{
+  "model_name": "gbdt-calibrated-updownflat",
+  "model_version": "20260909T000613Z",
+  "trained_at_utc": "2026-09-09T00:06:13.349060+00:00",
+  "symbol": "EURUSD",
+  "timeframe": "M15",
+  "feature_schema": [
+    "sma20",
+    "ema20",
+    "rsi14",
+    "atr14",
+    "close_vs_sma20",
+    "close_vs_ema20",
+    "atr_pct",
+    "adx14",
+    "swing_high_dist",
+    "swing_low_dist",
+    "bos_bull",
+    "bos_bear",
+    "range_pct",
+    "htf_trend",
+    "wma20",
+    "macd",
+    "macd_signal",
+    "macd_histogram",
+    "stochastic_k",
+    "stochastic_d",
+    "roc12",
+    "bollinger_width",
+    "bollinger_percent_b",
+    "historical_volatility20",
+    "vwap_distance",
+    "obv",
+    "higher_high",
+    "higher_low",
+    "lower_high",
+    "lower_low",
+    "choch_bull",
+    "choch_bear",
+    "pattern_bullish",
+    "pattern_bearish"
+  ],
+  "training_data_source": "dev-synthetic",
+  "training_row_count": 5916,
+  "walk_forward_folds": 5,
+  "metrics": {
+    "walk_forward_overall_accuracy": 0.999802761341223,
+    "walk_forward_overall_brier": 0.0008879795696927252,
+    "per_fold": [
+      {
+        "accuracy": 1.0,
+        "log_loss": 0.01190920198987908,
+        "per_class": {
+          "DOWN": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1": 1.0,
+            "support": 480
+          },
+          "FLAT": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1": 1.0,
+            "support": 54
+          },
+          "UP": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1": 1.0,
+            "support": 480
+          }
+        },
+        "n_samples": 1014,
+        "fold_index": 0,
+        "train_rows": 845,
+        "test_rows": 1014
+      },
+      {
+        "accuracy": 1.0,
+        "log_loss": 0.0023691314710369057,
+        "per_class": {
+          "DOWN": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1": 1.0,
+            "support": 480
+          },
+          "FLAT": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1": 1.0,
+            "support": 54
+          },
+          "UP": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1": 1.0,
+            "support": 480
+          }
+        },
+        "n_samples": 1014,
+        "fold_index": 1,
+        "train_rows": 1864,
+        "test_rows": 1014
+      },
+      {
+        "accuracy": 1.0,
+        "log_loss": 0.0017096756203006675,
+        "per_class": {
+          "DOWN": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1": 1.0,
+            "support": 480
+          },
+          "FLAT": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1": 1.0,
+            "support": 54
+          },
+          "UP": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1": 1.0,
+            "support": 480
+          }
+        },
+        "n_samples": 1014,
+        "fold_index": 2,
+        "train_rows": 2883,
+        "test_rows": 1014
+      },
+      {
+        "accuracy": 0.9990138067061144,
+        "log_loss": 0.0015156252758086117,
+        "per_class": {
+          "DOWN": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1": 1.0,
+            "support": 480
+          },
+          "FLAT": {
+            "precision": 0.9818181818181818,
+            "recall": 1.0,
+            "f1": 0.9908256880733946,
+            "support": 54
+          },
+          "UP": {
+            "precision": 1.0,
+            "recall": 0.9979166666666667,
+            "f1": 0.9989572471324296,
+            "support": 480
+          }
+        },
+        "n_samples": 1014,
+        "fold_index": 3,
+        "train_rows": 3902,
+        "test_rows": 1014
+      },
+      {
+        "accuracy": 1.0,
+        "log_loss": 0.0010308883316708442,
+        "per_class": {
+          "DOWN": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1": 1.0,
+            "support": 466
+          },
+          "FLAT": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1": 1.0,
+            "support": 51
+          },
+          "UP": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1": 1.0,
+            "support": 473
+          }
+        },
+        "n_samples": 990,
+        "fold_index": 4,
+        "train_rows": 4921,
+        "test_rows": 990
+      }
+    ]
+  },
+  "notes": [
+    "TRAINED ON DEV-SYNTHETIC DATA \u2014 pipeline validation only, not a real trading model"
+  ],
+  "feature_baseline_stats": {
+    "sma20": {
+      "mean": 1.0999856940431403,
+      "std": 0.00041526471211940336
+    },
+    "ema20": {
+      "mean": 1.0999853072851566,
+      "std": 0.0007572028998328972
+    },
+    "rsi14": {
+      "mean": 49.98614464588827,
+      "std": 12.062002859746435
+    },
+    "atr14": {
+      "mean": 0.0019097620873946932,
+      "std": 0.00015957600924776963
+    },
+    "close_vs_sma20": {
+      "mean": -2.64780666653022e-06,
+      "std": 0.002273688420398919
+    },
+    "close_vs_ema20": {
+      "mean": -1.8224014928383553e-06,
+      "std": 0.00240539585144136
+    },
+    "atr_pct": {
+      "mean": 0.001736185749508295,
+      "std": 0.00014515656136209224
+    },
+    "adx14": {
+      "mean": 22.071802682447267,
+      "std": 2.195409695834934
+    },
+    "swing_high_dist": {
+      "mean": 0.0038802481942326788,
+      "std": 0.0026311800778383953
+    },
+    "swing_low_dist": {
+      "mean": 0.00386404901651526,
+      "std": 0.0026108705241146375
+    },
+    "bos_bull": {
+      "mean": 0.0,
+      "std": 1e-09
+    },
+    "bos_bear": {
+      "mean": 0.0,
+      "std": 1e-09
+    },
+    "range_pct": {
+      "mean": 0.007744297210747988,
+      "std": 2.259228004201325e-05
+    },
+    "htf_trend": {
+      "mean": -7.000506150184498e-06,
+      "std": 0.0024873084091082054
+    },
+    "wma20": {
+      "mean": 1.0999854551580976,
+      "std": 0.0006712318158745331
+    },
+    "macd": {
+      "mean": -7.688666034331607e-07,
+      "std": 0.0006294248140635961
+    },
+    "macd_signal": {
+      "mean": -2.743440568928733e-07,
+      "std": 0.00032685907214697246
+    },
+    "macd_histogram": {
+      "mean": -4.945225465413666e-07,
+      "std": 0.00048103912191898137
+    },
+    "stochastic_k": {
+      "mean": 49.97802272090857,
+      "std": 34.12002115816021
+    },
+    "stochastic_d": {
+      "mean": 49.971355929775555,
+      "std": 32.580500794544
+    },
+    "roc12": {
+      "mean": 3.7222771615806987e-06,
+      "std": 0.004176295293710721
+    },
+    "bollinger_width": {
+      "mean": 0.01036758200232186,
+      "std": 0.00038822589626911564
+    },
+    "bollinger_percent_b": {
+      "mean": 0.49982650807328055,
+      "std": 0.215971847133656
+    },
+    "historical_volatility20": {
+      "mean": 0.015529855368171742,
+      "std": 0.0005814685756462736
+    },
+    "vwap_distance": {
+      "mean": -1.78374999246261e-07,
+      "std": 0.0023013771997378385
+    },
+    "obv": {
+      "mean": 354.26943881000676,
+      "std": 949.9904928632269
+    },
+    "higher_high": {
+      "mean": 0.5065922920892495,
+      "std": 0.49995653979622073
+    },
+    "higher_low": {
+      "mean": 0.5049019607843137,
+      "std": 0.4999759702030379
+    },
+    "lower_high": {
+      "mean": 0.4934077079107505,
+      "std": 0.49995653979622073
+    },
+    "lower_low": {
+      "mean": 0.4950980392156863,
+      "std": 0.4999759702030379
+    },
+    "choch_bull": {
+      "mean": 0.0,
+      "std": 1e-09
+    },
+    "choch_bear": {
+      "mean": 0.0,
+      "std": 1e-09
+    },
+    "pattern_bullish": {
+      "mean": 0.0290736984448952,
+      "std": 0.16801314979378995
+    },
+    "pattern_bearish": {
+      "mean": 0.029749830966869506,
+      "std": 0.16989637584219447
+    }
+  }
+}
