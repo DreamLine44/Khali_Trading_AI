@@ -12,6 +12,14 @@ export interface Mt5FileBridgeConfig {
   maxRequestAgeMs?: number;
 }
 
+export interface Mt5Identity {
+  magicNumber: number;
+  accountId: string;
+  server: string;
+  symbol?: string;
+  timeframe?: string;
+}
+
 interface ResponseLine {
   requestId: string;
   status: "OK" | "ERROR";
@@ -59,23 +67,35 @@ export class Mt5FileBridge {
 
   async isConnected(expectedMagic?: number, expectedAccountId?: string, expectedServer?: string): Promise<boolean> {
     try {
-      const response = await this.request("PING");
-      const pong = response.find((line) => line.fields[0] === "PONG");
-      if (!pong || pong.fields.length < 2) return false;
+      const identity = await this.getIdentity();
       if (expectedMagic !== undefined) {
-        const magic = Number(pong.fields[1]);
-        if (!Number.isInteger(magic) || magic !== expectedMagic) return false;
+        if (identity.magicNumber !== expectedMagic) return false;
       }
       if (expectedAccountId !== undefined) {
-        if (pong.fields.length < 3 || pong.fields[2] !== expectedAccountId) return false;
+        if (identity.accountId !== expectedAccountId) return false;
       }
       if (expectedServer !== undefined) {
-        if (pong.fields.length < 4 || pong.fields[3] !== expectedServer) return false;
+        if (identity.server !== expectedServer) return false;
       }
       return true;
     } catch {
       return false;
     }
+  }
+
+  async getIdentity(): Promise<Mt5Identity> {
+    const response = await this.request("PING");
+    const pong = response.find((line) => line.fields[0] === "PONG");
+    if (!pong || pong.fields.length < 4) throw new Error("MT5 returned no valid identity");
+    const magicNumber = Number(pong.fields[1]);
+    if (!Number.isInteger(magicNumber) || !pong.fields[2] || !pong.fields[3]) throw new Error("MT5 returned malformed identity");
+    return {
+      magicNumber,
+      accountId: pong.fields[2],
+      server: pong.fields[3],
+      symbol: pong.fields[4] || undefined,
+      timeframe: pong.fields[5] || undefined,
+    };
   }
 
   async getHistoricalCandles(symbol: string, timeframe: Timeframe, count: number): Promise<Candle[]> {
@@ -96,6 +116,13 @@ export class Mt5FileBridge {
     }
     if (candles.length === 0) throw new Error("MT5 returned no candles");
     return candles;
+  }
+
+  async resolveSymbol(symbol: string): Promise<string> {
+    const response = await this.request("RESOLVE", symbol);
+    const line = response.find((item) => item.fields[0] === "R");
+    if (!line || line.fields.length !== 2 || !line.fields[1]) throw new Error(`MT5 could not resolve broker symbol '${symbol}'`);
+    return line.fields[1];
   }
 
   async getLatestQuote(symbol: string): Promise<Quote> {

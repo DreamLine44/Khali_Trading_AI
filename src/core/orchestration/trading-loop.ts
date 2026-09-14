@@ -44,11 +44,14 @@ export async function runOnce(
 ): Promise<AuditRecord> {
   const notes: string[] = [];
 
-  if (deps.executionAdapter.isLive && env.tradingMode !== "live") {
-    throw new Error("live execution adapter requires TRADING_MODE=live");
+  if (deps.executionAdapter.isLive && !["live", "synthetic"].includes(env.tradingMode)) {
+    throw new Error("live execution adapter requires TRADING_MODE=synthetic or live");
   }
-  if (deps.executionAdapter.isLive && !env.liveTradingEnabled) {
+  if (deps.executionAdapter.isLive && env.tradingMode === "live" && !env.liveTradingEnabled) {
     throw new Error("live execution is disabled by LIVE_TRADING_ENABLED");
+  }
+  if (deps.executionAdapter.isLive && env.tradingMode === "synthetic" && !env.syntheticTradingEnabled) {
+    throw new Error("synthetic execution is disabled by SYNTHETIC_TRADING_ENABLED");
   }
   if (deps.executionAdapter.isLive && !deps.predictionProvider) {
     throw new Error("live execution requires a real prediction provider");

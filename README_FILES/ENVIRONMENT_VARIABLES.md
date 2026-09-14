@@ -25,7 +25,7 @@ real values filled in.
 
 - **Just running the vertical slice / backtest / tests?** None. Skip
   straight to the next section if you're setting up live trading later.
-- **Running paper or live mode against a real MT5 terminal?** You need
+- **Running paper, synthetic, or live mode against a real MT5 terminal?** You need
   the whole **MT5 bridge** section below, plus **MongoDB**.
 - **Going live?** You need everything above, plus **Live activation**,
   plus at least one provider from **News/sentiment** and one from
@@ -184,6 +184,8 @@ touching any of these.
 | Variable | How to get it |
 |---|---|
 | `LIVE_TRADING_ENABLED` | Set to `true` yourself, deliberately — not issued by anything. |
+| `SYNTHETIC_TRADING_ENABLED` | Set to `true` only for explicitly confirmed deterministic orders on the connected MT5 account. |
+| `SYNTHETIC_ACTIVATION_CONFIRMATION` | Must equal `I_UNDERSTAND_SYNTHETIC_ORDERS` in synthetic mode. |
 | `LIVE_ACTIVATION_TOKEN` | Self-generated, ≥32 characters, e.g. `openssl rand -hex 32`. Never reuse `MT5_BRIDGE_SECRET` or any other secret for this — generate a fresh one. |
 | `LIVE_ACTIVATION_CONFIRMATION` | Must be the exact literal string `I_UNDERSTAND_LIVE_TRADING` — you type this yourself as a second, separate confirmation; it's not a value anyone gives you. |
 | `LIVE_REQUIRE_EVIDENCE` | Must stay `true` in live mode — `env.ts` throws if you set it to `false` while `TRADING_MODE=live`. There's no way to obtain a value that disables this gate. |

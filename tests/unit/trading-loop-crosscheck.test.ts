@@ -102,7 +102,7 @@ async function testCrosscheckRejectionReasonSurvives() {
     orderManager: new OrderManager(undefined, "paper"),
     auditLog,
     automaticMarketData: fakeAutomaticMarketData(),
-    predictionProvider: async () => [{ modelName: "test", modelVersion: "1", action: "BUY", probability: 0.9, uncertainty: 0.05 }],
+    predictionProvider: async () => [{ modelName: "test", modelVersion: "1", action: "SELL", probability: 0.9, uncertainty: 0.05 }],
   });
 
   assert.strictEqual(record.risk.approved, false, "trade must still be blocked");

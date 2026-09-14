@@ -79,7 +79,7 @@ interface StatusFileState {
   alertedCycleFailed: boolean;
 }
 
-const defaultStatusPath = path.join(__dirname, "../../src/monitoring/runtime/status.json");
+const defaultStatusPath = env.runtimeStatusFile;
 
 /**
  * [FIX-CYCLE-FAILURE-VISIBILITY] Complements the Mongo-polling `evaluate`

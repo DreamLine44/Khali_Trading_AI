@@ -4,7 +4,7 @@ import * as path from "path";
 import { env } from "../config/env";
 
 const publicDir = path.join(__dirname, "public");
-const statusPath = path.join(process.cwd(), "src/monitoring/runtime/status.json");
+const statusPath = env.runtimeStatusFile;
 
 /**
  * Factory rather than an import-time side effect: previously this

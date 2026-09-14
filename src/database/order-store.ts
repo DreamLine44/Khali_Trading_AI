@@ -25,11 +25,12 @@ export class MongoOrderStore implements OrderStore {
   private readonly client: MongoClient;
   private readonly collection: Collection<OrderRequest>;
 
-  constructor(uri = env.mongodbUri, databaseName = env.mongodbDatabase) {
+  constructor(uri = env.mongodbUri, databaseName = env.mongodbDatabase, instanceId = env.tradingInstanceId) {
     if (!uri) throw new Error("MONGODB_URI is required for MongoOrderStore");
     this.client = new MongoClient(uri, { retryWrites: true, retryReads: true, serverSelectionTimeoutMS: 5000 });
     const database: Db = this.client.db(databaseName);
-    this.collection = database.collection<OrderRequest>("orders");
+    const collectionName = instanceId === "default" ? "orders" : `orders_${instanceId.replace(/[^a-zA-Z0-9_-]/g, "_")}`;
+    this.collection = database.collection<OrderRequest>(collectionName);
   }
 
   async connect(): Promise<void> {

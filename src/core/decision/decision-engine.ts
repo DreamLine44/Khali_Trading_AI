@@ -137,8 +137,26 @@ export function makeDecision(features: FeatureSet, predictions: ModelPrediction[
     const bearishPattern = features.candlestickPatterns.some(p => ["SHOOTING_STAR", "HANGING_MAN", "BEARISH_ENGULFING", "EVENING_STAR", "DARK_CLOUD_COVER", "MARUBOZU_BEAR", "TWEEZER_TOP"].includes(p));
     const supporting = action === "BUY" ? Number(bullishStructure) + Number(bullishMomentum) + Number(bullishPattern) : Number(bearishStructure) + Number(bearishMomentum) + Number(bearishPattern);
     const opposing = action === "BUY" ? Number(bearishStructure) + Number(bearishMomentum) + Number(bearishPattern) : Number(bullishStructure) + Number(bullishMomentum) + Number(bullishPattern);
+    if (supporting < env.decisionMinSupportingFactors) {
+      reasons.push(`insufficient market confluence (${supporting} supporting factors, need ${env.decisionMinSupportingFactors})`);
+      return finalize("NO_TRADE", 0, reasons, features, predictions);
+    }
     if (opposing >= 2 && supporting < opposing) {
       reasons.push(`AI ${action} conflicts with independent market confluence (${supporting} supporting vs ${opposing} opposing factors)`);
+      return finalize("NO_TRADE", 0, reasons, features, predictions);
+    }
+    if (env.decisionRequireHtfAlignment && features.htfTrend !== null && features.htfTrend !== 0) {
+      const htfAligned = action === "BUY" ? features.htfTrend > 0 : features.htfTrend < 0;
+      if (!htfAligned) {
+        reasons.push(`AI ${action} conflicts with higher-timeframe trend (${features.htfTrend.toFixed(4)})`);
+        return finalize("NO_TRADE", 0, reasons, features, predictions);
+      }
+    }
+    const roomToOpposingStructure = action === "BUY" ? features.swingHighDist : features.swingLowDist;
+    if (features.rangePct !== null && roomToOpposingStructure !== null
+      && roomToOpposingStructure > 0
+        && roomToOpposingStructure < features.rangePct * env.decisionMinRoomToStructurePct) {
+      reasons.push(`entry is too close to opposing structure (${roomToOpposingStructure.toFixed(4)} of price vs required room)`);
       return finalize("NO_TRADE", 0, reasons, features, predictions);
     }
     if (features.regime === "ABNORMAL" || features.regime === "TRANSITION" || features.regime === "UNKNOWN") {

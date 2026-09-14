@@ -90,7 +90,10 @@ function testInvalidPredictionIsRejected() {
 }
 
 function testInvalidRiskInputsAreRejected() {
-  const decision = makeDecision(featureSet(), [{
+  const decision = makeDecision(featureSet({
+    structureTrend: "BULLISH",
+    macdHistogram: 0.001,
+  }), [{
     modelName: "model",
     modelVersion: "1",
     action: "BUY",
@@ -109,9 +112,42 @@ function testInvalidRiskInputsAreRejected() {
   assert.ok(result.reasons.some((reason) => reason.includes("balance/equity")));
 }
 
+function testDirectionalEntriesNeedConfluenceAndRoom() {
+  const prediction = [{
+    modelName: "model",
+    modelVersion: "1",
+    action: "SELL" as const,
+    probability: 0.9,
+    uncertainty: 0.05,
+  }];
+  const noConfluence = makeDecision(featureSet({ htfTrend: -0.01 }), prediction);
+  assert.strictEqual(noConfluence.action, "NO_TRADE");
+  assert.ok(noConfluence.reasons.some((reason) => reason.includes("insufficient market confluence")));
+
+  const tooCloseToSupport = makeDecision(featureSet({
+    htfTrend: -0.01,
+    structureTrend: "BEARISH",
+    macdHistogram: -0.001,
+    swingLowDist: 0.0001,
+    rangePct: 0.006,
+  }), prediction);
+  assert.strictEqual(tooCloseToSupport.action, "NO_TRADE");
+  assert.ok(tooCloseToSupport.reasons.some((reason) => reason.includes("opposing structure")));
+
+  const alignedPullback = makeDecision(featureSet({
+    htfTrend: -0.01,
+    structureTrend: "BEARISH",
+    macdHistogram: -0.001,
+    swingLowDist: 0.003,
+    rangePct: 0.006,
+  }), prediction);
+  assert.strictEqual(alignedPullback.action, "SELL");
+}
+
 testInvalidMarketDataIsRejected();
 testInvalidPredictionIsRejected();
 testInvalidRiskInputsAreRejected();
+testDirectionalEntriesNeedConfluenceAndRoom();
 
 // [FIX-RISK-DEFAULT-PARITY] Regression coverage: DEFAULT_RISK_LIMITS (what
 // runBacktest()/evaluateRisk() silently fall back to without explicit risk

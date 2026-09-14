@@ -200,11 +200,28 @@ MT5_ACCOUNT_ID=<your MT5 account number>
 MT5_SERVER=<your broker's server name, exactly as shown in MT5 → Account tab>
 MT5_COMMON_DIRECTORY=<the path the Experts log printed in Section 3, step 9>
 MT5_BRIDGE_SECRET=<the exact same string you set as InpBridgeSecret in Section 3, step 5>
-MT5_SYMBOL=EURUSD
-MT5_TIMEFRAME=M15
+# Paper mode may leave these blank to adopt the EA chart identity.
+MT5_SYMBOL=
+MT5_TIMEFRAME=
 
 MONGODB_URI=mongodb://localhost:27017
 ```
+
+Paper mode simulates fills and never submits broker orders. To test the
+complete deterministic strategy against the connected MT5 demo account,
+use the separately gated synthetic mode:
+
+```text
+TRADING_MODE=synthetic
+SYNTHETIC_TRADING_ENABLED=true
+SYNTHETIC_ACTIVATION_CONFIRMATION=I_UNDERSTAND_SYNTHETIC_ORDERS
+AI_ENABLED=false
+```
+
+Synthetic mode submits real orders to the connected MT5 account, so use a
+demo account and keep all risk/data/reconciliation gates enabled. It does not
+use a production ML model. Live mode remains the only mode permitted to use
+production model artifacts.
 
 Then set the environment variable for this shell session:
 

@@ -47,7 +47,11 @@ export class OrderManager {
   private readonly seenIdempotencyKeys = new Set<string>();
   private readonly orders = new Map<string, OrderRequest>();
 
-  constructor(private readonly store?: OrderStore, private readonly executionEnvironment: "paper" | "live" = "paper") {}
+  constructor(
+    private readonly store?: OrderStore,
+    private readonly executionEnvironment: "paper" | "live" = "paper",
+    private readonly instanceId = "default",
+  ) {}
 
   private async lookupOrder(orderId: string): Promise<OrderRequest | null> {
     return this.orders.get(orderId) ?? (this.store ? await this.store.get(orderId) : null) ?? null;
@@ -66,12 +70,18 @@ export class OrderManager {
     if (!Number.isFinite(risk.takeProfitPrice) || risk.takeProfitPrice === null || risk.takeProfitPrice <= 0) {
       return null;
     }
-    const signalKey = createHash("sha256").update(`${decision.id}:${decision.action}`).digest("hex").slice(0, 20);
+    const instanceKey = createHash("sha256").update(this.instanceId).digest("hex").slice(0, 8);
+    const signalKey = createHash("sha256").update(`${this.instanceId}:${decision.id}:${decision.action}`).digest("hex").slice(0, 16);
     const normalizedReferencePrice = Number.isFinite(referencePrice) && (referencePrice as number) > 0 ? referencePrice : null;
 
     for (let attempt = 1; attempt <= OrderManager.MAX_ENTRY_ATTEMPTS; attempt++) {
-      const idempotencyKey = `AI_${signalKey}_${attempt}`;
-      const orderId = `ord_${idempotencyKey}`;
+      // MT5 limits position comments/idempotency keys to 31 characters.
+      // Keep a compact tenant fingerprint in the broker-visible key while
+      // retaining the full instance identity in durable Mongo namespaces.
+      const idempotencyKey = this.instanceId === "default"
+        ? `AI_${createHash("sha256").update(`${decision.id}:${decision.action}`).digest("hex").slice(0, 20)}_${attempt}`
+        : `AI_${instanceKey}_${signalKey}_${attempt}`;
+      const orderId = this.instanceId === "default" ? `ord_${idempotencyKey}` : `ord_${this.instanceId}_${signalKey}_${attempt}`;
       const existing = await this.lookupOrder(orderId);
       if (existing) {
         // A prior attempt for this exact decision already occupies this

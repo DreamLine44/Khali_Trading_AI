@@ -23,7 +23,7 @@ export function validateCandles(
   const seenTimestamps = new Set<number>();
   let prevTs: number | null = null;
   const expectedStepMs = timeframeStepMs(timeframe);
-  const allowWeekendGap = opts.allowWeekendGap ?? symbol.length === 6;
+  const allowWeekendGap = opts.allowWeekendGap ?? isWeekendMarketSymbol(symbol);
 
   for (const c of candles) {
     if (c.symbol !== symbol) issues.push(`symbol mismatch: expected ${symbol}, got ${c.symbol}`);
@@ -116,4 +116,11 @@ function timeframeStepMs(tf: Timeframe): number {
     D1: 24 * 60 * 60_000,
   };
   return map[tf];
+}
+
+function isWeekendMarketSymbol(symbol: string): boolean {
+  const normalized = symbol.toUpperCase().replace(/[^A-Z]/g, "");
+  const base = normalized.slice(0, 6);
+  const currencies = new Set(["USD", "EUR", "GBP", "JPY", "AUD", "NZD", "CAD", "CHF"]);
+  return base.length === 6 && currencies.has(base.slice(0, 3)) && currencies.has(base.slice(3));
 }

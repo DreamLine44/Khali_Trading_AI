@@ -320,8 +320,9 @@ way to validate the whole system end-to-end with zero execution risk.
    MT5_SERVER=<your broker's server name>
    MT5_COMMON_DIRECTORY=<path to the MT5 terminal's Common\Files folder>
    MT5_BRIDGE_SECRET=<a shared secret matching the EA's config>
-   MT5_SYMBOL=EURUSD
-   MT5_TIMEFRAME=M15
+  # Paper mode can leave these blank to use the EA chart identity.
+  MT5_SYMBOL=
+  MT5_TIMEFRAME=
    ```
 
 2. Set the mode:
@@ -404,8 +405,8 @@ data.
    MT5_SERVER=<your broker's server name>
    MT5_COMMON_DIRECTORY=<path to the MT5 terminal's Common\Files folder>
    MT5_BRIDGE_SECRET=<a shared secret matching the EA's config>
-   MT5_SYMBOL=EURUSD
-   MT5_TIMEFRAME=M15
+  MT5_SYMBOL=<explicit production model symbol>
+  MT5_TIMEFRAME=<explicit production model timeframe>
    ALPHA_VANTAGE_API_KEY=<your key>       # or NEWS_EVIDENCE_ENDPOINT
    FINNHUB_API_KEY=<your key>             # free; or ECONOMIC_CALENDAR_API_KEY/ECONOMIC_EVIDENCE_ENDPOINT
    ```

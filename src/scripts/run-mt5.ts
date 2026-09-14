@@ -31,8 +31,8 @@ function timeframe(value: string): Timeframe {
 
 async function main(): Promise<void> {
   const mode = env.tradingMode;
-  if (mode !== "paper" && mode !== "live") {
-    throw new Error("run:mt5 requires TRADING_MODE=paper or TRADING_MODE=live");
+  if (mode !== "paper" && mode !== "synthetic" && mode !== "live") {
+    throw new Error("run:mt5 requires TRADING_MODE=paper, synthetic, or live");
   }
   if (mode === "live") {
     if (env.nodeEnv !== "production" || !env.liveTradingEnabled || env.liveActivationToken.length < 32) {
@@ -40,6 +40,9 @@ async function main(): Promise<void> {
     }
     if (!env.aiEnabled || env.modelStage !== "production") {
       throw new Error("live activation requires AI_ENABLED=true and MODEL_STAGE=production");
+    }
+    if (!env.mt5Symbol || !env.mt5Timeframe) {
+      throw new Error("live activation requires explicit MT5_SYMBOL and MT5_TIMEFRAME for model identity");
     }
     const modelDir = path.join(env.appRoot, "models", "production");
     // Same fix as preflight-live.ts: `fs.Dirent` objects sort as
@@ -73,9 +76,7 @@ async function main(): Promise<void> {
     assertProductionModelQualityGates(metrics);
   }
 
-  const symbol = env.mt5Symbol;
-  const selectedTimeframe = timeframe(env.mt5Timeframe);
-  const historyBars = { M1: 1500, M5: 400, M15: 250, H1: 120, H4: 120, D1: 120 }[selectedTimeframe];
+  const requestedSymbol = env.mt5Symbol;
   const commonDirectory = requireEnv("mt5CommonDirectory");
   const bridgeSecret = requireEnv("mt5BridgeSecret");
   const bridge = new Mt5FileBridge({ commonDirectory, secret: bridgeSecret, timeoutMs: env.mt5BridgeTimeoutMs, maxRequestAgeMs: env.mt5MaxRequestAgeMs });
@@ -90,6 +91,19 @@ async function main(): Promise<void> {
   });
 
   if (!(await bridge.isConnected(env.mt5MagicNumber, requireEnv("mt5AccountId"), requireEnv("mt5Server")))) throw new Error("MT5 EA bridge is not connected or MT5 magic/account/server identity does not match configured values");
+  const identity = await bridge.getIdentity();
+  if (!identity.symbol || !identity.timeframe) throw new Error("MT5 EA must report its attached chart symbol and timeframe");
+  if (env.mt5Timeframe && env.mt5Timeframe !== identity.timeframe) {
+    throw new Error(`MT5 chart timeframe ${identity.timeframe} does not match configured MT5_TIMEFRAME ${env.mt5Timeframe}`);
+  }
+  const selectedTimeframe = timeframe(env.mt5Timeframe || identity.timeframe);
+  const symbol = await bridge.resolveSymbol(requestedSymbol || identity.symbol);
+  if (requestedSymbol && symbol !== identity.symbol) {
+    throw new Error(`MT5 chart symbol ${identity.symbol} does not match configured symbol ${requestedSymbol}`);
+  }
+  if (symbol !== requestedSymbol && requestedSymbol) console.log(`MT5 symbol alias resolved: ${requestedSymbol} -> ${symbol}`);
+  if (!requestedSymbol) console.log(`MT5 symbol auto-detected from chart: ${symbol}`);
+  const historyBars = { M1: 1500, M5: 400, M15: 250, H1: 120, H4: 120, D1: 120 }[selectedTimeframe];
 
   const accountStore = new MongoAccountStore();
   const orderStore = new MongoOrderStore();
@@ -125,8 +139,11 @@ async function main(): Promise<void> {
     : undefined;
   const automaticMarketData = new AutomaticMarketDataOrchestrator();
 
-  const executionAdapter = mode === "live" ? new Mt5ExecutionAdapter(bridge) : new PaperExecutionAdapter();
-  const orderManager = new OrderManager(orderStore, mode);
+  const executionAdapter = mode === "paper" ? new PaperExecutionAdapter() : new Mt5ExecutionAdapter(bridge);
+  // Both synthetic and live send broker orders, so durable order records use
+  // the existing live execution identity for reconciliation. The mode itself
+  // still controls which startup/model gates apply above.
+  const orderManager = new OrderManager(orderStore, mode === "synthetic" ? "live" : mode, env.tradingInstanceId);
   const driftMonitor = new DriftMonitor();
   const predictionProvider = async (
     features: Parameters<NonNullable<Parameters<typeof runOnce>[3]["predictionProvider"]>>[0],
@@ -212,7 +229,7 @@ async function main(): Promise<void> {
           historyBars,
           automaticMarketData,
         });
-        writeRuntimeStatus(record, mode);
+        writeRuntimeStatus(record, mode, env.runtimeStatusFile);
         console.log(JSON.stringify(record));
         consecutiveCycleErrors = 0;
       } catch (error) {
@@ -230,7 +247,7 @@ async function main(): Promise<void> {
         // to catch it. Write an honest unhealthy status directly here so
         // both surfaces reflect reality.
         try {
-          writeCycleFailureStatus(mode, message, consecutiveCycleErrors);
+          writeCycleFailureStatus(mode, message, consecutiveCycleErrors, env.runtimeStatusFile);
         } catch (statusWriteError) {
           console.error(`failed to record cycle-failure status: ${statusWriteError instanceof Error ? statusWriteError.message : String(statusWriteError)}`);
         }
@@ -248,29 +265,45 @@ async function main(): Promise<void> {
   }
 }
 function buildNonMlPrediction(features: Parameters<NonNullable<Parameters<typeof runOnce>[3]["predictionProvider"]>>[0]) {
-  const bullish = [
+  const bullishTrend = [
     features.structureTrend === "BULLISH",
     features.bosBull === 1,
     features.chochBull === 1,
-    (features.macdHistogram ?? 0) > 0,
-    (features.roc12 ?? 0) > 0,
     features.htfTrend !== null && features.htfTrend > 0,
+    features.ema20 !== null && features.sma20 !== null && features.ema20 > features.sma20,
   ].filter(Boolean).length;
-  const bearish = [
+  const bearishTrend = [
     features.structureTrend === "BEARISH",
     features.bosBear === 1,
     features.chochBear === 1,
+    features.htfTrend !== null && features.htfTrend < 0,
+    features.ema20 !== null && features.sma20 !== null && features.ema20 < features.sma20,
+  ].filter(Boolean).length;
+  const bullishMomentum = [
+    (features.macdHistogram ?? 0) > 0,
+    (features.roc12 ?? 0) > 0,
+    features.stochasticK !== null && features.stochasticD !== null && features.stochasticK > features.stochasticD,
+  ].filter(Boolean).length;
+  const bearishMomentum = [
     (features.macdHistogram ?? 0) < 0,
     (features.roc12 ?? 0) < 0,
-    features.htfTrend !== null && features.htfTrend < 0,
+    features.stochasticK !== null && features.stochasticD !== null && features.stochasticK < features.stochasticD,
   ].filter(Boolean).length;
+  const buyLocation = (features.rsi14 === null || (features.rsi14 >= 45 && features.rsi14 <= 68))
+    && (features.bollingerPercentB === null || features.bollingerPercentB <= 0.75);
+  const sellLocation = (features.rsi14 === null || (features.rsi14 >= 32 && features.rsi14 <= 55))
+    && (features.bollingerPercentB === null || features.bollingerPercentB >= 0.25);
+  const bullishPattern = features.candlestickPatterns.some((pattern) => ["HAMMER", "BULLISH_ENGULFING", "MORNING_STAR", "PIERCING", "MARUBOZU_BULL", "TWEEZER_BOTTOM"].includes(pattern));
+  const bearishPattern = features.candlestickPatterns.some((pattern) => ["SHOOTING_STAR", "HANGING_MAN", "BEARISH_ENGULFING", "EVENING_STAR", "DARK_CLOUD_COVER", "MARUBOZU_BEAR", "TWEEZER_TOP"].includes(pattern));
+  const bullish = bullishTrend + bullishMomentum + Number(buyLocation) + Number(bullishPattern) - Number(bearishPattern);
+  const bearish = bearishTrend + bearishMomentum + Number(sellLocation) + Number(bearishPattern) - Number(bullishPattern);
   const total = Math.max(1, bullish + bearish);
-  if (bullish === bearish || Math.max(bullish, bearish) < 2) {
-    return { modelName: "deterministic-market-analysis", modelVersion: "rules-v1", action: "HOLD" as const, probability: 0.5, uncertainty: 0.5 };
+  if (Math.max(bullish, bearish) < 5 || bullish === bearish || Math.abs(bullish - bearish) < 2) {
+    return { modelName: "deterministic-market-analysis", modelVersion: "rules-v2", action: "HOLD" as const, probability: 0.5, uncertainty: 0.5 };
   }
   const action = bullish > bearish ? "BUY" as const : "SELL" as const;
   const probability = Math.min(0.95, 0.55 + (Math.max(bullish, bearish) / total) * 0.35);
-  return { modelName: "deterministic-market-analysis", modelVersion: "rules-v1", action, probability, uncertainty: 1 - probability };
+  return { modelName: "deterministic-market-analysis", modelVersion: "rules-v2", action, probability, uncertainty: 1 - probability };
 }
 
 main().catch((error) => {

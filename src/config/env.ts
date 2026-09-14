@@ -72,11 +72,18 @@ function booleanValue(name: string, fallback: boolean): boolean {
   if (raw !== "true" && raw !== "false") throw new Error(`${name} must be true or false`);
   return raw === "true";
 }
+function safeInstanceId(value: string): string {
+  const normalized = value.trim().toLowerCase().replace(/[^a-z0-9_-]+/g, "-").replace(/^-+|-+$/g, "");
+  if (!normalized) throw new Error("TRADING_INSTANCE_ID must contain at least one letter or number");
+  return normalized.slice(0, 80);
+}
 
 const tradingMode = stringValue("TRADING_MODE", "dev").toLowerCase();
-if (!["dev", "backtest", "paper", "live"].includes(tradingMode)) {
-  throw new Error("TRADING_MODE must be dev, backtest, paper, or live");
+if (!["dev", "backtest", "paper", "synthetic", "live"].includes(tradingMode)) {
+  throw new Error("TRADING_MODE must be dev, backtest, paper, synthetic, or live");
 }
+const configuredInstanceId = stringValue("TRADING_INSTANCE_ID");
+const tradingInstanceId = safeInstanceId(configuredInstanceId || "default");
 
 const aiEnabled = booleanValue("AI_ENABLED", false);
 const aiModeRaw = stringValue("AI_MODE", "ensemble").toLowerCase();
@@ -97,6 +104,9 @@ const aiMaxUncertainty = numberValue("AI_MAX_UNCERTAINTY", Number(stringValue("M
 const evidenceMaxAgeMs = integerValue("EVIDENCE_MAX_AGE_MS", 900000, 0);
 const decisionMinRegimeConfidence = numberValue("DECISION_MIN_REGIME_CONFIDENCE", 0.30, 0, 1);
 const decisionMinConfidence = numberValue("DECISION_MIN_CONFIDENCE", 0.55, 0, 1);
+const decisionRequireHtfAlignment = booleanValue("DECISION_REQUIRE_HTF_ALIGNMENT", true);
+const decisionMinSupportingFactors = integerValue("DECISION_MIN_SUPPORTING_FACTORS", 1, 1, 3);
+const decisionMinRoomToStructurePct = numberValue("DECISION_MIN_ROOM_TO_STRUCTURE_PCT", 0.20, 0, 1);
 const evidenceMinConfidence = numberValue("EVIDENCE_MIN_CONFIDENCE", 0.20, 0, 1);
 const driftZThreshold = numberValue("DRIFT_Z_THRESHOLD", 3, 0);
 const mt5BridgeTimeoutMs = integerValue("MT5_BRIDGE_TIMEOUT_MS", 10000, 100);
@@ -138,10 +148,13 @@ const autoResearchMaxQuoteDeviationPct = numberValue("AUTO_RESEARCH_MAX_QUOTE_DE
 const newsRefreshIntervalMs = integerValue("NEWS_REFRESH_INTERVAL_MS", 60000, 5000);
 const economicRefreshIntervalMs = integerValue("ECONOMIC_REFRESH_INTERVAL_MS", 300000, 30000);
 const liveTradingEnabled = booleanValue("LIVE_TRADING_ENABLED", false);
+const syntheticTradingEnabled = booleanValue("SYNTHETIC_TRADING_ENABLED", false);
+const syntheticActivationConfirmation = stringValue("SYNTHETIC_ACTIVATION_CONFIRMATION");
 const liveActivationToken = stringValue("LIVE_ACTIVATION_TOKEN");
 const liveRequireEvidence = booleanValue("LIVE_REQUIRE_EVIDENCE", true);
 const liveActivationConfirmation = stringValue("LIVE_ACTIVATION_CONFIRMATION");
-const liveKillSwitchFile = stringValue("LIVE_KILL_SWITCH_FILE", path.join(root, "LIVE_KILL_SWITCH"));
+const liveKillSwitchFile = stringValue("LIVE_KILL_SWITCH_FILE", path.join(root, configuredInstanceId ? `LIVE_KILL_SWITCH-${tradingInstanceId}` : "LIVE_KILL_SWITCH"));
+const runtimeStatusFile = stringValue("RUNTIME_STATUS_FILE", path.join(root, "src", "monitoring", "runtime", configuredInstanceId ? `status-${tradingInstanceId}.json` : "status.json"));
 const mt5MaxRequestAgeMs = integerValue("MT5_MAX_REQUEST_AGE_MS", 30_000, 1000, 300_000);
 // A client-side submitOrder() timeout marks the durable order FAILED
 // synchronously, even though the broker can still fill it moments later.
@@ -151,6 +164,9 @@ const mt5MaxRequestAgeMs = integerValue("MT5_MAX_REQUEST_AGE_MS", 30_000, 1000, 
 const reconciliationFailedLookbackMs = integerValue("RECONCILIATION_FAILED_LOOKBACK_MS", 86_400_000, 0);
 if (tradingMode === "live" && environment !== "production") {
   throw new Error("TRADING_MODE=live requires NODE_ENV=production");
+}
+if (tradingMode === "live" && !configuredInstanceId) {
+  throw new Error("TRADING_MODE=live requires an explicit TRADING_INSTANCE_ID for tenant isolation");
 }
 if (tradingMode === "live" && !liveTradingEnabled) {
   throw new Error("TRADING_MODE=live requires LIVE_TRADING_ENABLED=true");
@@ -164,6 +180,12 @@ if (tradingMode === "live" && liveActivationConfirmation !== "I_UNDERSTAND_LIVE_
 if (tradingMode === "live" && liveRequireEvidence !== true) {
   throw new Error("TRADING_MODE=live requires LIVE_REQUIRE_EVIDENCE=true");
 }
+if (tradingMode === "synthetic" && !syntheticTradingEnabled) {
+  throw new Error("TRADING_MODE=synthetic requires SYNTHETIC_TRADING_ENABLED=true");
+}
+if (tradingMode === "synthetic" && syntheticActivationConfirmation !== "I_UNDERSTAND_SYNTHETIC_ORDERS") {
+  throw new Error("TRADING_MODE=synthetic requires SYNTHETIC_ACTIVATION_CONFIRMATION=I_UNDERSTAND_SYNTHETIC_ORDERS");
+}
 const pythonCommand = stringValue("PYTHON_COMMAND") || (process.platform === "win32" ? "py" : "python3");
 const modelStage = stringValue("MODEL_STAGE", "production").toLowerCase();
 if (!["development", "staging", "production"].includes(modelStage)) throw new Error("MODEL_STAGE must be development, staging, or production");
@@ -172,6 +194,7 @@ export const env = {
   nodeEnv: environment,
   appRoot: root,
   tradingMode,
+  tradingInstanceId,
   mongodbUri: stringValue("MONGODB_URI"),
   mongodbDatabase: stringValue("MONGODB_DATABASE", "ai_trading_bot"),
   mt5AccountId: stringValue("MT5_ACCOUNT_ID"),
@@ -180,8 +203,11 @@ export const env = {
   mt5BridgeSecret: stringValue("MT5_BRIDGE_SECRET"),
   mt5BridgeTimeoutMs,
   pythonPredictionTimeoutMs,
-  mt5Symbol: stringValue("MT5_SYMBOL", "EURUSD"),
-  mt5Timeframe: stringValue("MT5_TIMEFRAME", "M15"),
+  // Optional in paper mode: when blank, run-mt5 adopts the authenticated
+  // symbol/timeframe of the chart hosting the EA. Live mode requires both
+  // values explicitly because production models are identity-specific.
+  mt5Symbol: stringValue("MT5_SYMBOL"),
+  mt5Timeframe: stringValue("MT5_TIMEFRAME"),
   mt5PollIntervalMs,
   mt5MagicNumber: integerValue("MT5_MAGIC_NUMBER", 26090601, 1),
   vendorDataApiKey: stringValue("VENDOR_DATA_API_KEY"),
@@ -209,6 +235,9 @@ export const env = {
   evidenceMinConfidence,
   decisionMinRegimeConfidence,
   decisionMinConfidence,
+  decisionRequireHtfAlignment,
+  decisionMinSupportingFactors,
+  decisionMinRoomToStructurePct,
   driftZThreshold,
   dashboardPort,
   monitorPollIntervalMs,
@@ -232,10 +261,13 @@ export const env = {
   newsRefreshIntervalMs,
   economicRefreshIntervalMs,
   liveTradingEnabled,
+  syntheticTradingEnabled,
+  syntheticActivationConfirmation,
   liveActivationToken,
   liveRequireEvidence,
   liveActivationConfirmation,
   liveKillSwitchFile,
+  runtimeStatusFile,
   mt5MaxRequestAgeMs,
   reconciliationFailedLookbackMs,
 };

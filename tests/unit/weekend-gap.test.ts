@@ -55,6 +55,22 @@ function testMondayReopenIsNotFlaggedAsGap() {
   );
 }
 
+function testSuffixedForexSymbolIsNotFlaggedAsGap() {
+  const fridayClose = Date.UTC(2026, 8, 11, 21, 0, 0);
+  const sundayReopen = Date.UTC(2026, 8, 13, 21, 5, 0);
+  const now = sundayReopen + 15 * 60_000;
+  const report = validateCandles(
+    "EURUSDm",
+    "M15",
+    [candle(fridayClose, { symbol: "EURUSDm" }), candle(sundayReopen, { symbol: "EURUSDm" })],
+    { now }
+  );
+  assert.ok(
+    !report.issues.some((issue) => issue.includes("gap in series")),
+    `expected no gap-in-series issue for broker-suffixed forex symbol, got: ${JSON.stringify(report.issues)}`
+  );
+}
+
 // A genuine midweek gap (Tuesday -> Thursday, market open the whole time)
 // must still be flagged — the broadened weekend allowance must not swallow
 // a real data outage.
@@ -76,5 +92,6 @@ function testMidweekGapIsStillFlagged() {
 
 testSundayReopenIsNotFlaggedAsGap();
 testMondayReopenIsNotFlaggedAsGap();
+testSuffixedForexSymbolIsNotFlaggedAsGap();
 testMidweekGapIsStillFlagged();
 console.log("All weekend-gap regression tests passed.");

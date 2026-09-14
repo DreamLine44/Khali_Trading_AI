@@ -11,11 +11,12 @@ export class MongoAccountStore {
   private readonly client: MongoClient;
   private readonly collection: Collection<AccountSnapshot>;
 
-  constructor(uri = env.mongodbUri, databaseName = env.mongodbDatabase) {
+  constructor(uri = env.mongodbUri, databaseName = env.mongodbDatabase, instanceId = env.tradingInstanceId) {
     if (!uri) throw new Error("MONGODB_URI is required for MongoAccountStore");
     this.client = new MongoClient(uri, { retryWrites: true, retryReads: true });
     const database: Db = this.client.db(databaseName);
-    this.collection = database.collection<AccountSnapshot>("account_snapshots");
+    const collectionName = instanceId === "default" ? "account_snapshots" : `account_snapshots_${instanceId.replace(/[^a-zA-Z0-9_-]/g, "_")}`;
+    this.collection = database.collection<AccountSnapshot>(collectionName);
   }
 
   async connect(): Promise<void> {

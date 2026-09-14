@@ -12,13 +12,14 @@ export class MongoAuditLog implements AuditLog {
   private readonly client: MongoClient;
   private readonly collection: Collection<AuditRecord>;
 
-  constructor(uri = env.mongodbUri, databaseName = env.mongodbDatabase) {
+  constructor(uri = env.mongodbUri, databaseName = env.mongodbDatabase, instanceId = env.tradingInstanceId) {
     if (!uri) {
       throw new Error("MONGODB_URI is required for MongoAuditLog");
     }
     this.client = new MongoClient(uri, { retryWrites: true, retryReads: true });
     const database: Db = this.client.db(databaseName);
-    this.collection = database.collection<AuditRecord>("trade_decisions");
+    const collectionName = instanceId === "default" ? "trade_decisions" : `trade_decisions_${instanceId.replace(/[^a-zA-Z0-9_-]/g, "_")}`;
+    this.collection = database.collection<AuditRecord>(collectionName);
   }
 
   async connect(): Promise<void> {
@@ -29,7 +30,16 @@ export class MongoAuditLog implements AuditLog {
   }
 
   async append(record: AuditRecord): Promise<void> {
-    await this.collection.insertOne(record);
+    try {
+      await this.collection.insertOne(record);
+    } catch (error) {
+      // The loop can poll the same still-forming candle more than once. The
+      // decision ID is intentionally candle-scoped, so replaying the same
+      // decision is an idempotent no-op; unrelated MongoDB failures must still
+      // propagate and trip the safety circuit breaker.
+      if (error instanceof Error && /duplicate key/i.test(error.message)) return;
+      throw error;
+    }
   }
 
   async close(): Promise<void> {

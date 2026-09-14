@@ -11,6 +11,7 @@ async function main(): Promise<void> {
     throw new Error("preflight requires NODE_ENV=production, TRADING_MODE=live and LIVE_TRADING_ENABLED=true");
   }
   if (!env.aiEnabled || env.modelStage !== "production") throw new Error("live preflight requires AI_ENABLED=true and MODEL_STAGE=production");
+  if (!env.mt5Symbol || !env.mt5Timeframe) throw new Error("live preflight requires explicit MT5_SYMBOL and MT5_TIMEFRAME for model identity");
   if (env.liveActivationToken.length < 32) throw new Error("LIVE_ACTIVATION_TOKEN is missing or too short");
   if (!env.liveRequireEvidence) throw new Error("live preflight requires LIVE_REQUIRE_EVIDENCE=true");
   if (env.liveRequireEvidence && !(env.alphaVantageApiKey || env.newsEvidenceEndpoint)) throw new Error("live preflight: news/sentiment provider missing");

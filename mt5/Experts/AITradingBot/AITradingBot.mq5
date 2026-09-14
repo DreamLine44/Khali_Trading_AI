@@ -87,13 +87,15 @@ void OnTimer()
      }
 
    if(operation=="PING")
-      WriteResponse(request_id, StringFormat("PONG|%I64d|%I64d|%s|2.0.0", InpMagicNumber, AccountInfoInteger(ACCOUNT_LOGIN), AccountInfoString(ACCOUNT_SERVER)));
+    WriteResponse(request_id, StringFormat("PONG|%I64d|%I64d|%s|%s|%s|2.0.0", InpMagicNumber, AccountInfoInteger(ACCOUNT_LOGIN), AccountInfoString(ACCOUNT_SERVER), _Symbol, ChartTimeframeName()));
    else if(operation=="QUOTE" && count>=4)
       HandleQuote(request_id, fields[3]);
    else if(operation=="HISTORY" && count>=5)
       HandleHistory(request_id, fields[3], fields[4], count>=6 ? (int)StringToInteger(fields[5]) : 0);
    else if(operation=="ACCOUNT")
       HandleAccount(request_id);
+  else if(operation=="RESOLVE" && count>=4)
+    HandleResolve(request_id, fields[3]);
    else if(operation=="POSITIONS")
       HandlePositions(request_id);
    else if(operation=="SYMBOL" && count>=7)
@@ -102,6 +104,20 @@ void OnTimer()
       HandleOrder(request_id, fields);
    else
       WriteError(request_id, "invalid request");
+  }
+
+string ChartTimeframeName()
+  {
+   switch((ENUM_TIMEFRAMES)_Period)
+     {
+      case PERIOD_M1: return "M1";
+      case PERIOD_M5: return "M5";
+      case PERIOD_M15: return "M15";
+      case PERIOD_H1: return "H1";
+      case PERIOD_H4: return "H4";
+      case PERIOD_D1: return "D1";
+     }
+   return "";
   }
 
 void WriteResponse(const string request_id, const string payload)
@@ -154,6 +170,51 @@ void HandleQuote(const string request_id, const string symbol)
    WriteResponse(request_id, StringFormat("Q|%I64d|%.10f|%.10f|%.10f", timestamp, tick.bid, tick.ask, spread));
   }
 
+bool ResolveBrokerSymbol(const string requested, string &resolved)
+  {
+   string wanted=requested;
+   StringToUpper(wanted);
+   if(wanted=="") return false;
+
+   if(SymbolSelect(requested, true))
+     {
+      resolved=requested;
+      return true;
+     }
+
+   string candidate="";
+   int candidate_length=2147483647;
+   int total=SymbolsTotal(false);
+   for(int i=0; i<total; i++)
+     {
+      string name=SymbolName(i, false);
+      string upper=name;
+      StringToUpper(upper);
+      if(StringFind(upper, wanted)<0) continue;
+      if(candidate!="" && StringLen(name)==candidate_length) return false;
+      if(StringLen(name)<candidate_length)
+        {
+         candidate=name;
+         candidate_length=StringLen(name);
+        }
+     }
+   if(candidate=="") return false;
+   if(!SymbolSelect(candidate, true)) return false;
+   resolved=candidate;
+   return true;
+  }
+
+void HandleResolve(const string request_id, const string requested)
+  {
+   string resolved="";
+   if(!ResolveBrokerSymbol(requested, resolved))
+     {
+      WriteError(request_id, "symbol unavailable or symbol alias is ambiguous");
+      return;
+     }
+   WriteResponse(request_id, "R|"+resolved);
+  }
+
 void HandleHistory(const string request_id, const string symbol, const string timeframe_value, const int requested_count)
   {
    ENUM_TIMEFRAMES timeframe=ParseTimeframe(timeframe_value);
@@ -179,7 +240,12 @@ void HandleAccount(const string request_id)
    double equity=AccountInfoDouble(ACCOUNT_EQUITY);
    double free_margin=AccountInfoDouble(ACCOUNT_MARGIN_FREE);
    int positions=PositionsTotal();
-   if(!MathIsValidNumber(balance) || !MathIsValidNumber(equity) || !MathIsValidNumber(free_margin) || equity<=0 || free_margin<0) { WriteError(request_id, "account state unavailable"); return; }
+   if(!MathIsValidNumber(balance) || !MathIsValidNumber(equity) || !MathIsValidNumber(free_margin) || equity<=0 || free_margin<0)
+     {
+      Print("AITradingBot: account state unavailable. balance=", DoubleToString(balance, 2), " equity=", DoubleToString(equity, 2), " free_margin=", DoubleToString(free_margin, 2), " positions=", positions, " error=", GetLastError());
+      WriteError(request_id, StringFormat("account state unavailable balance=%.2f equity=%.2f free_margin=%.2f positions=%d error=%d", balance, equity, free_margin, positions, GetLastError()));
+      return;
+     }
    WriteResponse(request_id, StringFormat("A|%.10f|%.10f|%.10f|%d", balance, equity, free_margin, positions));
   }
 
